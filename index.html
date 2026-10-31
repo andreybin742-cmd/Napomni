@@ -131,6 +131,7 @@ textarea{resize:vertical;min-height:70px}
     <div class="lbl">Токен бота (из @BotFather)</div>
     <input id="tk" type="password" placeholder="123456:ABC..." autocomplete="off">
     <div class="hint" id="chat"></div>
+    <div class="hint" id="err" style="color:#ffb3c4"></div>
     <button class="btn">Сохранить и подключить</button>
     <button type="button" class="btn g" id="test">Отправить тест</button>
     <div class="hint">1. Вставьте токен и сохраните.<br>2. Откройте бота в Telegram и нажмите Start.<br>3. Чат подключится сам, пока эта страница открыта.<br>Токен хранится только в вашем браузере.</div>
@@ -202,7 +203,7 @@ function renderAll(){renderCal();renderUp();renderStatus();if($('#sheet').classL
 /* ---------- Telegram ---------- */
 async function tg(method,body={}){
   if(!token())return null;
-  try{const r=await fetch(`https://api.telegram.org/bot${token()}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return await r.json()}catch(e){return null}
+  try{const r=await fetch(`https://api.telegram.org/bot${token()}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return await r.json()}catch(e){return {ok:false,network:true,description:String(e)}}
 }
 const card=t=>`📌 <b>${esc(t.title)}</b>\n🗓 ${esc(nice(t))}${t.note?`\n📝 ${esc(t.note)}`:''}\n🔔 ${t.done?'✅ выполнено':t.rem!=null?'напомню '+REM[t.rem]:'без напоминания'}`;
 const kb=t=>({inline_keyboard:[
@@ -291,10 +292,12 @@ $('#tdy').onclick=()=>{view=new Date();view.setDate(1);renderCal()};
 $('#st').onclick=()=>{$('#tk').value=BOT_TOKEN?'':cfg.token||'';$('#tk').disabled=!!BOT_TOKEN;renderStatus();$('#set').classList.add('open')};
 $('#sf').addEventListener('submit',async e=>{
   e.preventDefault();
-  if(!BOT_TOKEN){cfg.token=$('#tk').value.trim();cfg.chat=cfg.chat||null;saveCfg()}
+  const err=$('#err');err.textContent='Проверяю токен…';
+  if(!BOT_TOKEN){cfg.token=$('#tk').value.replace(/[\s\u200B-\u200D\uFEFF]/g,'');cfg.chat=cfg.chat||null;saveCfg()}
   const r=await tg('getMe');
-  if(r&&r.ok){toast('Бот @'+r.result.username+' найден. Нажмите Start в Telegram');renderStatus();poll()}
-  else toast('Токен не подошёл. Проверьте его в @BotFather');
+  if(r&&r.ok){err.textContent='';toast('Бот @'+r.result.username+' найден. Нажмите Start в Telegram');renderStatus();poll()}
+  else if(r&&r.network)err.textContent='Нет связи с api.telegram.org (сеть, блокировка или VPN). Это не ошибка токена. Детали: '+r.description;
+  else err.textContent='Telegram ответил: '+(r&&r.error_code?r.error_code+' '+r.description:'нет ответа')+'. Токен неверный или отозван.';
 });
 $('#test').onclick=async()=>{
   if(!cfg.chat){toast('Сначала нажмите Start в боте');return}
